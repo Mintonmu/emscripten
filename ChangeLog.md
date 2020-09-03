@@ -37,6 +37,12 @@ Current Trunk
     `emrun filename.html -- --arg-for-page`
   This is standard behaviour for command line parsing and simplifies the
   emrun logic.
+- The ABI used symbol imports/export in dynamic linking (MAIN_MODULE +
+  SIDE_MODULE) is not that same as the ABI used by llvm and wasm-ld.  That
+  is symbol addresses are imports from the 'GOT.mem' and 'GOT.func'
+  pseudo modules.  As one side effect of this change it is now required that
+  JavaScript functions that are imported by address are not required to have
+  a `__sig` specified in the library JavaScript file.
 
 2.0.7: 10/13/2020
 -----------------
