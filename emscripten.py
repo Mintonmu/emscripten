@@ -427,11 +427,6 @@ def finalize_wasm(infile, memfile, DEBUG):
   # if we don't need to modify the wasm, don't tell finalize to emit a wasm file
   modify_wasm = False
 
-  if shared.Settings.SIDE_MODULE:
-    # We currently run the replace-stack-pointer pass on side modules.
-    # TODO(sbc): stop doing this.
-    modify_wasm = True
-
   if shared.Settings.WASM2JS:
     # wasm2js requires full legalization (and will do extra wasm binary
     # later processing later anyhow)

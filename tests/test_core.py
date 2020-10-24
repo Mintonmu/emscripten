@@ -3645,7 +3645,8 @@ ok
     if is_optimizing(self.emcc_args):
       self.skipTest('no modify mode only works with non-optimizing builds')
     self.set_setting('WASM_BIGINT')
-    self.do_basic_dylink_test(main_emcc_args=['-sERROR_ON_WASM_CHANGES_AFTER_LINK'])
+    self.set_setting('ERROR_ON_WASM_CHANGES_AFTER_LINK')
+    self.do_basic_dylink_test()
 
   @needs_dlfcn
   def test_dylink_no_export(self):
