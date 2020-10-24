@@ -152,7 +152,7 @@ var LibraryDylink = {
         } else if (typeof value === 'number') {
           GOT[symName].value = value;
         } else {
-          assert(false, "bad export type: " + (typeof value));
+          assert(false, 'bad export type for `' + symName + '`: ' + (typeof value));
         }
       }
     }
