@@ -619,11 +619,18 @@ var LibraryDylink = {
 
   $preloadDylibs__deps: ['$loadDynamicLibrary', '$reportUndefinedSymbols'],
   $preloadDylibs: function() {
+#ifdef DYLINK_DEBUG
+    err('preloadDylibs');
+#endif
     var libs = {{{ JSON.stringify(RUNTIME_LINKED_LIBS) }}};
     if (Module['dynamicLibraries']) {
       libs = libs.concat(Module['dynamicLibraries'])
     }
     if (!libs.length) {
+#ifdef DYLINK_DEBUG
+      err('preloadDylibs: no libraries to preload');
+#endif
+      reportUndefinedSymbols();
       return;
     }
 
@@ -636,6 +643,7 @@ var LibraryDylink = {
       })).then(function() {
         // we got them all, wonderful
         removeRunDependency('preloadDylibs');
+        reportUndefinedSymbols();
       });
       return;
     }
@@ -644,6 +652,7 @@ var LibraryDylink = {
       // libraries linked to main never go away
       loadDynamicLibrary(lib, {global: true, nodelete: true, allowUndefined: true});
     });
+    reportUndefinedSymbols();
   },
 
   // void* dlopen(const char* filename, int flag);
