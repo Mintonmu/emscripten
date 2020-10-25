@@ -71,9 +71,7 @@ SPECIAL_ENDINGLESS_FILENAMES = (os.devnull,)
 SOURCE_ENDINGS = C_ENDINGS + CXX_ENDINGS + OBJC_ENDINGS + OBJCXX_ENDINGS + SPECIAL_ENDINGLESS_FILENAMES + ASSEMBLY_CPP_ENDINGS
 C_ENDINGS = C_ENDINGS + SPECIAL_ENDINGLESS_FILENAMES # consider the special endingless filenames like /dev/null to be C
 
-JS_ENDINGS = ('.js', '.mjs', '.out', '')
-WASM_ENDINGS = ('.wasm',)
-EXECUTABLE_ENDINGS = JS_ENDINGS + WASM_ENDINGS + ('.html',)
+EXECUTABLE_ENDINGS = ('.wasm', '.html', '.js', '.mjs', '.out', '')
 DYNAMICLIB_ENDINGS = ('.dylib', '.so') # Windows .dll suffix is not included in this list, since those are never linked to directly on the command line.
 STATICLIB_ENDINGS = ('.a',)
 ASSEMBLY_ENDINGS = ('.ll', '.s')
@@ -217,6 +215,7 @@ def base64_encode(b):
 
 class EmccOptions(object):
   def __init__(self):
+    self.oformat = None
     self.requested_debug = ''
     self.profiling = False
     self.profiling_funcs = False
@@ -1134,11 +1133,21 @@ There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR P
       final_suffix = '.mout' # not bitcode, not js; but just dependency rule of the input file
 
     # target is now finalized, can finalize other _target s
-    if final_suffix == '.mjs':
+    if not options.oformat:
+      if shared.Settings.SIDE_MODULE or final_suffix == '.wasm':
+        options.oformat = 'wasm'
+      elif final_suffix == '.mjs':
+        options.oformat = 'mjs'
+      elif final_suffix == '.html':
+        options.oformat = 'html'
+      else:
+        options.oformat = 'js'
+
+    if options.oformat == 'mjs':
       shared.Settings.EXPORT_ES6 = 1
       shared.Settings.MODULARIZE = 1
 
-    if shared.Settings.SIDE_MODULE or final_suffix in WASM_ENDINGS:
+    if options.oformat == 'wasm':
       # If the user asks directly for a wasm file then this *is* the target
       wasm_target = target
     else:
@@ -1153,7 +1162,7 @@ There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR P
 
     shared.verify_settings()
 
-    if final_suffix in WASM_ENDINGS and not shared.Settings.SIDE_MODULE:
+    if options.oformat == 'wasm' and not shared.Settings.SIDE_MODULE:
       # if the output is just a wasm file, it will normally be a standalone one,
       # as there is no JS. an exception are side modules, as we can't tell at
       # compile time whether JS will be involved or not - the main module may
@@ -1670,7 +1679,7 @@ There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR P
         not shared.Settings.AUTODEBUG and \
         not shared.Settings.ASSERTIONS and \
         not shared.Settings.RELOCATABLE and \
-        not target.endswith(WASM_ENDINGS) and \
+        not options.oformat == 'wasm' and \
         not shared.Settings.ASYNCIFY_LAZY_LOAD_CODE and \
             shared.Settings.MINIFY_ASMJS_EXPORT_NAMES:
       shared.Settings.MINIFY_WASM_IMPORTS_AND_EXPORTS = 1
@@ -2158,8 +2167,6 @@ There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR P
       # /dev/null, but that will take some refactoring
       return 0
 
-    wasm_only = shared.Settings.SIDE_MODULE or final_suffix in WASM_ENDINGS
-
     if shared.Settings.MEM_INIT_IN_WASM:
       memfile = None
     else:
@@ -2176,7 +2183,7 @@ There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR P
       if embed_memfile():
         shared.Settings.SUPPORT_BASE64_EMBEDDING = 1
 
-      if wasm_only:
+      if options.oformat == 'wasm':
         final_js = None
       else:
         final_js = tmp_wasm + '.js'
@@ -2258,7 +2265,7 @@ There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR P
 
     log_time('binaryen')
     # If we are not emitting any JS then we are all done now
-    if wasm_only:
+    if options.oformat == 'wasm':
       return
 
     with ToolchainProfiler.profile_block('final emitting'):
@@ -2308,7 +2315,7 @@ There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR P
 
       shared.JS.handle_license(final_js)
 
-      if final_suffix in JS_ENDINGS:
+      if options.oformat in ('js', 'mjs'):
         js_target = target
       else:
         js_target = unsuffixed(target) + '.js'
@@ -2320,7 +2327,7 @@ There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR P
         generated_text_files_with_native_eols += [js_target]
 
       # If we were asked to also generate HTML, do that
-      if final_suffix == '.html':
+      if options.oformat == 'html':
         generate_html(target, options, js_target, target_basename,
                       wasm_target, memfile)
       else:
@@ -2435,6 +2442,11 @@ def parse_args(newargs):
       options.extern_pre_js += open(consume_arg()).read() + '\n'
     elif check_arg('--extern-post-js'):
       options.extern_post_js += open(consume_arg()).read() + '\n'
+    elif check_arg('--oformat'):
+      options.oformat = consume_arg()
+      formats = ('js', 'html', 'wasm', 'mjs')
+      if options.oformat not in formats:
+        exit_with_error('invalid output format: `%s` (must be one of %s)' % (options.oformat, formats))
     elif check_arg('--minify'):
       arg = consume_arg()
       if arg != '0':
